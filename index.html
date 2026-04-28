@@ -3,28 +3,83 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>パスコード付き動画プレイヤー</title>
+<title>Video Vault</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
-  html, body {
-    width: 100%;
-    height: 100%;
+  :root {
+    --accent-1: #00f5ff;
+    --accent-2: #ff00e5;
+    --accent-3: #ffe600;
   }
+
+  html, body { width: 100%; height: 100%; }
 
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-    min-height: 100vh;
-    min-height: 100dvh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Hiragino Kaku Gothic ProN", sans-serif;
+    background: #05060f;
     color: #fff;
     overflow: hidden;
+    min-height: 100dvh;
   }
 
-  .container {
+  /* ===== アニメーション背景 ===== */
+  .bg {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    z-index: 0;
+  }
+
+  .blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.6;
+    mix-blend-mode: screen;
+    animation: float 20s ease-in-out infinite;
+  }
+
+  .blob.b1 {
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, var(--accent-1), transparent 70%);
+    top: -150px; left: -100px;
+  }
+
+  .blob.b2 {
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, var(--accent-2), transparent 70%);
+    bottom: -200px; right: -150px;
+    animation-delay: -7s;
+  }
+
+  .blob.b3 {
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, var(--accent-3), transparent 70%);
+    top: 40%; left: 60%;
+    animation-delay: -14s;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(60px, -40px) scale(1.1); }
+    66% { transform: translate(-40px, 50px) scale(0.95); }
+  }
+
+  .grid-overlay {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+  }
+
+  .stage {
+    position: relative;
+    z-index: 1;
     width: 100%;
     height: 100%;
     height: 100dvh;
@@ -34,316 +89,409 @@
     padding: 20px;
   }
 
-  /* ロック中はカードを中央に置きたいので幅を制限 */
-  .container.locked {
-    max-width: 720px;
-  }
-
-  /* ロック画面 */
+  /* ===== ロック画面 ===== */
   .lock-screen {
     width: 100%;
-    max-width: 420px;
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 20px;
-    padding: 48px 32px;
+    max-width: 440px;
     text-align: center;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    animation: rise 0.8s cubic-bezier(0.2, 0.9, 0.3, 1.2);
   }
 
-  .lock-icon {
-    width: 72px;
-    height: 72px;
-    margin: 0 auto 24px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 50%;
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(30px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .lock-orb {
+    width: 110px;
+    height: 110px;
+    margin: 0 auto 28px;
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 32px;
   }
 
-  .lock-screen h1 {
-    font-size: 24px;
-    font-weight: 600;
-    margin-bottom: 8px;
+  .lock-orb::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, var(--accent-1), var(--accent-2), var(--accent-3), var(--accent-1));
+    animation: spin 6s linear infinite;
+    filter: blur(2px);
   }
 
-  .lock-screen p {
-    color: rgba(255, 255, 255, 0.6);
-    font-size: 14px;
-    margin-bottom: 32px;
+  .lock-orb::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #1a1a2e, #05060f);
+    box-shadow: inset 0 0 30px rgba(0, 245, 255, 0.3);
+  }
+
+  .lock-orb svg {
+    position: relative;
+    z-index: 1;
+    width: 48px;
+    height: 48px;
+    transition: transform 0.4s cubic-bezier(0.5, -0.5, 0.5, 1.5);
+    filter: drop-shadow(0 0 6px rgba(0, 245, 255, 0.8));
+  }
+
+  .lock-orb.unlocked svg .shackle {
+    transform: rotate(-25deg) translateY(-4px);
+    transform-origin: 75% 50%;
+  }
+
+  .lock-orb.shake { animation: orbShake 0.5s ease-in-out; }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes orbShake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-12px) rotate(-3deg); }
+    40% { transform: translateX(12px) rotate(3deg); }
+    60% { transform: translateX(-8px) rotate(-2deg); }
+    80% { transform: translateX(8px) rotate(2deg); }
+  }
+
+  .lock-title {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    background: linear-gradient(90deg, #fff, #c0e6ff, #fff);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: shine 3s linear infinite;
+  }
+
+  @keyframes shine {
+    to { background-position: 200% 0; }
+  }
+
+  .lock-sub {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 13px;
+    margin-bottom: 36px;
+    letter-spacing: 0.5px;
   }
 
   .passcode-display {
     display: flex;
     justify-content: center;
-    gap: 12px;
-    margin-bottom: 24px;
+    gap: 18px;
+    margin-bottom: 36px;
   }
 
   .passcode-dot {
-    width: 16px;
-    height: 16px;
-    border: 2px solid rgba(255, 255, 255, 0.4);
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
-    transition: all 0.2s;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    background: transparent;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
   }
 
   .passcode-dot.filled {
-    background: #fff;
-    border-color: #fff;
+    border-color: var(--accent-1);
+    background: var(--accent-1);
+    box-shadow: 0 0 12px var(--accent-1), 0 0 24px rgba(0, 245, 255, 0.4);
+    transform: scale(1.15);
   }
 
   .passcode-dot.error {
-    border-color: #ff4757;
-    animation: shake 0.4s ease-in-out;
-  }
-
-  @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-8px); }
-    75% { transform: translateX(8px); }
+    border-color: #ff3860;
+    background: #ff3860;
+    box-shadow: 0 0 12px #ff3860;
   }
 
   .keypad {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
-    max-width: 280px;
+    gap: 16px;
+    max-width: 320px;
     margin: 0 auto;
   }
 
   .key {
     aspect-ratio: 1;
-    border: none;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     color: #fff;
-    font-size: 24px;
-    font-weight: 400;
+    font-size: 26px;
+    font-weight: 300;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.15s ease;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     user-select: none;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .key .letters {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.4);
+    margin-top: 2px;
   }
 
   .key:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(0, 245, 255, 0.4);
+    box-shadow: 0 0 20px rgba(0, 245, 255, 0.15);
   }
 
-  .key:active {
-    transform: scale(0.95);
-    background: rgba(255, 255, 255, 0.3);
+  .key:active, .key.pressed {
+    transform: scale(0.92);
+    background: rgba(0, 245, 255, 0.2);
+    border-color: var(--accent-1);
+    box-shadow: 0 0 30px rgba(0, 245, 255, 0.5);
   }
 
   .key.action {
     background: transparent;
-    font-size: 14px;
+    border-color: transparent;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.6);
   }
 
   .key.action:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: none;
+    border-color: rgba(255, 255, 255, 0.1);
   }
 
-  .error-message {
-    color: #ff4757;
+  .error-line {
+    margin-top: 24px;
+    height: 18px;
+    color: #ff3860;
     font-size: 13px;
-    margin-top: 16px;
-    min-height: 18px;
+    letter-spacing: 1px;
     opacity: 0;
     transition: opacity 0.2s;
   }
 
-  .error-message.show {
-    opacity: 1;
-  }
+  .error-line.show { opacity: 1; }
 
-  /* プレイヤー画面 */
-  .player-screen {
+  /* ===== プレイヤー ===== */
+  .player {
     display: none;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.4);
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     flex-direction: column;
+    gap: 12px;
   }
 
-  .player-screen.active {
+  .player.active {
     display: flex;
-    animation: fadeIn 0.4s ease-out;
+    animation: rise 0.5s ease-out;
   }
 
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .player-header {
+  .player-bar {
     flex: 0 0 auto;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: 12px 20px;
-    background: rgba(0, 0, 0, 0.5);
+    gap: 12px;
+    padding: 0 4px;
   }
 
-  .player-header h2 {
-    font-size: 16px;
-    font-weight: 500;
+  .player-bar .brand {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.6);
   }
 
-  .lock-btn {
-    background: rgba(255, 255, 255, 0.1);
-    border: none;
+  .player-bar .spacer { flex: 1; }
+
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.03);
     color: #fff;
-    padding: 8px 16px;
-    border-radius: 8px;
     cursor: pointer;
-    font-size: 13px;
-    transition: background 0.15s;
-  }
-
-  .lock-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-  }
-
-  .video-wrapper {
-    flex: 1 1 auto;
-    min-height: 0;
-    background: #000;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: all 0.15s;
+  }
+
+  .icon-btn:hover {
+    background: rgba(0, 245, 255, 0.15);
+    border-color: var(--accent-1);
+  }
+
+  .icon-btn svg { width: 18px; height: 18px; }
+
+  .stage-area {
+    flex: 1 1 auto;
+    min-height: 0;
+    background: #000;
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
   }
 
   video {
     width: 100%;
     height: 100%;
-    display: block;
-    background: #000;
     object-fit: contain;
+    background: #000;
   }
 
-  .video-source-input {
-    flex: 0 0 auto;
-    padding: 12px 20px;
-    background: rgba(0, 0, 0, 0.3);
-  }
-
-  .video-source-input label {
-    display: block;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.6);
-    margin-bottom: 8px;
-  }
-
-  .video-source-input input[type="file"],
-  .video-source-input input[type="text"] {
-    width: 100%;
-    padding: 10px 12px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
-    color: #fff;
-    font-size: 13px;
-    margin-bottom: 8px;
-  }
-
-  .video-source-input input[type="text"]::placeholder {
-    color: rgba(255, 255, 255, 0.4);
-  }
-
-  .saved-list {
-    flex: 0 0 auto;
-    max-height: 30vh;
-    overflow-y: auto;
-    padding: 8px 20px 16px;
-    background: rgba(0, 0, 0, 0.3);
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
-  }
-
-  .saved-list h3 {
-    font-size: 12px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.6);
-    margin-bottom: 8px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .saved-list .empty {
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.4);
-    padding: 8px 0;
-  }
-
-  .saved-item {
+  .empty-state {
+    position: absolute;
+    inset: 0;
     display: flex;
+    flex-direction: column;
     align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: rgba(255, 255, 255, 0.4);
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  .empty-state svg { width: 56px; height: 56px; opacity: 0.6; }
+  .empty-state.hidden { opacity: 0; }
+
+  .drop-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 245, 255, 0.15);
+    border: 3px dashed var(--accent-1);
+    border-radius: 16px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--accent-1);
+    z-index: 5;
+  }
+
+  .drop-overlay.show { display: flex; }
+
+  .library {
+    flex: 0 0 auto;
+    display: flex;
     gap: 10px;
-    padding: 8px 10px;
+    overflow-x: auto;
+    padding: 4px 4px 8px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.2) transparent;
+  }
+
+  .library::-webkit-scrollbar { height: 6px; }
+  .library::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+
+  .lib-card {
+    flex: 0 0 auto;
+    width: 130px;
+    height: 80px;
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    margin-bottom: 6px;
+    border-radius: 10px;
     cursor: pointer;
-    transition: background 0.15s;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  .saved-item:hover {
-    background: rgba(255, 255, 255, 0.1);
+  .lib-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-1);
+    box-shadow: 0 6px 20px rgba(0, 245, 255, 0.2);
   }
 
-  .saved-item .icon {
-    font-size: 16px;
-    flex: 0 0 auto;
+  .lib-card.add {
+    border-style: dashed;
+    color: rgba(255, 255, 255, 0.5);
   }
 
-  .saved-item .name {
-    flex: 1 1 auto;
-    font-size: 13px;
+  .lib-card .lib-icon {
+    font-size: 24px;
+    margin-bottom: 4px;
+  }
+
+  .lib-card .lib-name {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 4px 6px;
+    font-size: 10px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.85));
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .saved-item .meta {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.4);
-    flex: 0 0 auto;
-  }
-
-  .saved-item .delete-btn {
-    background: transparent;
+  .lib-card .lib-del {
+    position: absolute;
+    top: 4px; right: 4px;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.6);
+    color: #fff;
     border: none;
-    color: rgba(255, 255, 255, 0.5);
+    font-size: 11px;
     cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 14px;
-    flex: 0 0 auto;
+    display: none;
+    align-items: center;
+    justify-content: center;
   }
 
-  .saved-item .delete-btn:hover {
-    background: rgba(255, 71, 87, 0.2);
-    color: #ff4757;
+  .lib-card:hover .lib-del { display: flex; }
+  .lib-card .lib-del:hover { background: #ff3860; }
+
+  .lib-card .add-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
 </style>
 </head>
 <body>
-  <div class="container locked" id="container">
+  <div class="bg">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+    <div class="grid-overlay"></div>
+  </div>
+
+  <div class="stage" id="stage">
     <!-- ロック画面 -->
-    <div id="lockScreen" class="lock-screen">
-      <div class="lock-icon">🔒</div>
-      <h1>パスコードを入力</h1>
-      <p>動画を再生するには4桁のパスコードを入力してください</p>
+    <div class="lock-screen" id="lockScreen">
+      <div class="lock-orb" id="lockOrb">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path class="shackle" d="M7 11V7a5 5 0 0 1 10 0v4" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+          <rect x="4" y="11" width="16" height="11" rx="2" fill="#fff"/>
+          <circle cx="12" cy="16" r="1.5" fill="#05060f"/>
+          <rect x="11.3" y="16" width="1.4" height="3" fill="#05060f"/>
+        </svg>
+      </div>
+      <div class="lock-title">VIDEO VAULT</div>
+      <div class="lock-sub">ENTER 4-DIGIT PASSCODE</div>
 
       <div class="passcode-display" id="passcodeDisplay">
         <div class="passcode-dot"></div>
@@ -353,63 +501,83 @@
       </div>
 
       <div class="keypad">
-        <button class="key" data-num="1">1</button>
-        <button class="key" data-num="2">2</button>
-        <button class="key" data-num="3">3</button>
-        <button class="key" data-num="4">4</button>
-        <button class="key" data-num="5">5</button>
-        <button class="key" data-num="6">6</button>
-        <button class="key" data-num="7">7</button>
-        <button class="key" data-num="8">8</button>
-        <button class="key" data-num="9">9</button>
-        <button class="key action" id="clearKey">クリア</button>
+        <button class="key" data-num="1">1<span class="letters">&nbsp;</span></button>
+        <button class="key" data-num="2">2<span class="letters">ABC</span></button>
+        <button class="key" data-num="3">3<span class="letters">DEF</span></button>
+        <button class="key" data-num="4">4<span class="letters">GHI</span></button>
+        <button class="key" data-num="5">5<span class="letters">JKL</span></button>
+        <button class="key" data-num="6">6<span class="letters">MNO</span></button>
+        <button class="key" data-num="7">7<span class="letters">PQRS</span></button>
+        <button class="key" data-num="8">8<span class="letters">TUV</span></button>
+        <button class="key" data-num="9">9<span class="letters">WXYZ</span></button>
+        <button class="key action" id="clearKey">CLEAR</button>
         <button class="key" data-num="0">0</button>
         <button class="key action" id="deleteKey">⌫</button>
       </div>
 
-      <div class="error-message" id="errorMessage">パスコードが違います</div>
+      <div class="error-line" id="errorLine">INCORRECT PASSCODE</div>
     </div>
 
-    <!-- プレイヤー画面 -->
-    <div id="playerScreen" class="player-screen">
-      <div class="player-header">
-        <h2>🎬 動画プレイヤー</h2>
-        <button class="lock-btn" id="lockBtn">ロック</button>
+    <!-- プレイヤー -->
+    <div class="player" id="player">
+      <div class="player-bar">
+        <div class="brand">VIDEO VAULT</div>
+        <div class="spacer"></div>
+        <button class="icon-btn" id="addBtn" title="動画を追加">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+        </button>
+        <button class="icon-btn" id="fullscreenBtn" title="フルスクリーン">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>
+          </svg>
+        </button>
+        <button class="icon-btn" id="lockBtn" title="ロック">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <rect x="4" y="11" width="16" height="10" rx="2"/>
+            <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+          </svg>
+        </button>
       </div>
-      <div class="video-wrapper">
-        <video id="videoPlayer" controls controlsList="nodownload">
-          お使いのブラウザは video タグに対応していません。
-        </video>
+
+      <div class="stage-area" id="stageArea">
+        <video id="videoPlayer" controls controlsList="nodownload"></video>
+        <div class="empty-state" id="emptyState">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="5" width="18" height="14" rx="2"/>
+            <path d="M10 9l5 3-5 3z" fill="currentColor"/>
+          </svg>
+          <div>動画をドラッグ&ドロップ または ＋ から追加</div>
+        </div>
+        <div class="drop-overlay" id="dropOverlay">DROP TO PLAY</div>
       </div>
-      <div class="video-source-input">
-        <label>動画ファイルを選択（DBに保存されます）</label>
-        <input type="file" id="fileInput" accept="video/*">
-        <label>または動画URLを入力</label>
-        <input type="text" id="urlInput" placeholder="https://example.com/video.mp4">
-      </div>
-      <div class="saved-list">
-        <h3>保存済みの動画</h3>
-        <div id="savedItems"></div>
-      </div>
+
+      <div class="library" id="library"></div>
+
+      <input type="file" id="fileInput" accept="video/*" hidden>
     </div>
   </div>
 
 <script>
-  // パスコード（4桁）。必要に応じて変更してください。
   const CORRECT_PASSCODE = '1234';
 
-  const container = document.getElementById('container');
+  const stage = document.getElementById('stage');
   const lockScreen = document.getElementById('lockScreen');
-  const playerScreen = document.getElementById('playerScreen');
+  const lockOrb = document.getElementById('lockOrb');
+  const player = document.getElementById('player');
   const dots = document.querySelectorAll('.passcode-dot');
-  const errorMessage = document.getElementById('errorMessage');
+  const errorLine = document.getElementById('errorLine');
   const videoPlayer = document.getElementById('videoPlayer');
   const fileInput = document.getElementById('fileInput');
-  const urlInput = document.getElementById('urlInput');
+  const library = document.getElementById('library');
+  const emptyState = document.getElementById('emptyState');
+  const stageArea = document.getElementById('stageArea');
+  const dropOverlay = document.getElementById('dropOverlay');
 
   let currentPasscode = '';
 
-  function updateDisplay() {
+  function updateDots() {
     dots.forEach((dot, i) => {
       dot.classList.toggle('filled', i < currentPasscode.length);
       dot.classList.remove('error');
@@ -417,95 +585,88 @@
   }
 
   function showError() {
-    dots.forEach(dot => dot.classList.add('error'));
-    errorMessage.classList.add('show');
+    dots.forEach(d => d.classList.add('error'));
+    errorLine.classList.add('show');
+    lockOrb.classList.add('shake');
     setTimeout(() => {
       currentPasscode = '';
-      updateDisplay();
-      errorMessage.classList.remove('show');
-    }, 600);
+      updateDots();
+      errorLine.classList.remove('show');
+      lockOrb.classList.remove('shake');
+    }, 700);
   }
 
   function unlock() {
-    lockScreen.style.display = 'none';
-    playerScreen.classList.add('active');
-    container.classList.remove('locked');
-    if (typeof refreshSavedList === 'function') refreshSavedList();
+    lockOrb.classList.add('unlocked');
+    setTimeout(() => {
+      lockScreen.style.display = 'none';
+      player.classList.add('active');
+      refreshLibrary();
+    }, 350);
   }
 
   function lock() {
-    playerScreen.classList.remove('active');
+    player.classList.remove('active');
     lockScreen.style.display = 'block';
-    container.classList.add('locked');
+    lockOrb.classList.remove('unlocked');
     currentPasscode = '';
-    updateDisplay();
+    updateDots();
     videoPlayer.pause();
   }
 
   function checkPasscode() {
-    if (currentPasscode === CORRECT_PASSCODE) {
-      unlock();
-    } else {
-      showError();
-    }
+    if (currentPasscode === CORRECT_PASSCODE) unlock();
+    else showError();
+  }
+
+  function pressKey(num) {
+    if (currentPasscode.length >= 4) return;
+    currentPasscode += num;
+    updateDots();
+    if (currentPasscode.length === 4) setTimeout(checkPasscode, 180);
   }
 
   document.querySelectorAll('.key[data-num]').forEach(key => {
-    key.addEventListener('click', () => {
-      if (currentPasscode.length >= 4) return;
-      currentPasscode += key.dataset.num;
-      updateDisplay();
-      if (currentPasscode.length === 4) {
-        setTimeout(checkPasscode, 150);
-      }
-    });
+    key.addEventListener('click', () => pressKey(key.dataset.num));
   });
 
   document.getElementById('deleteKey').addEventListener('click', () => {
     currentPasscode = currentPasscode.slice(0, -1);
-    updateDisplay();
+    updateDots();
   });
-
   document.getElementById('clearKey').addEventListener('click', () => {
     currentPasscode = '';
-    updateDisplay();
+    updateDots();
   });
 
   document.addEventListener('keydown', (e) => {
-    if (playerScreen.classList.contains('active')) return;
+    if (player.classList.contains('active')) return;
     if (/^[0-9]$/.test(e.key)) {
-      if (currentPasscode.length >= 4) return;
-      currentPasscode += e.key;
-      updateDisplay();
-      if (currentPasscode.length === 4) {
-        setTimeout(checkPasscode, 150);
-      }
+      const k = document.querySelector(`.key[data-num="${e.key}"]`);
+      if (k) { k.classList.add('pressed'); setTimeout(() => k.classList.remove('pressed'), 120); }
+      pressKey(e.key);
     } else if (e.key === 'Backspace') {
       currentPasscode = currentPasscode.slice(0, -1);
-      updateDisplay();
+      updateDots();
     } else if (e.key === 'Escape') {
       currentPasscode = '';
-      updateDisplay();
+      updateDots();
     }
   });
 
-  document.getElementById('lockBtn').addEventListener('click', lock);
-
   // ===== IndexedDB =====
   const DB_NAME = 'videoPlayerDB';
-  const DB_VERSION = 1;
   const STORE = 'videos';
   let dbPromise = null;
 
   function openDB() {
     if (dbPromise) return dbPromise;
     dbPromise = new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      const req = indexedDB.open(DB_NAME, 1);
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains(STORE)) {
-          const store = db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
-          store.createIndex('addedAt', 'addedAt');
+          db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
         }
       };
       req.onsuccess = () => resolve(req.result);
@@ -514,131 +675,118 @@
     return dbPromise;
   }
 
-  async function dbAdd(record) {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readwrite');
-      const req = tx.objectStore(STORE).add(record);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
+  function tx(mode) {
+    return openDB().then(db => db.transaction(STORE, mode).objectStore(STORE));
   }
 
+  async function dbAdd(rec) {
+    const store = await tx('readwrite');
+    return new Promise((res, rej) => {
+      const r = store.add(rec); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    });
+  }
   async function dbGetAll() {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readonly');
-      const req = tx.objectStore(STORE).getAll();
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
+    const store = await tx('readonly');
+    return new Promise((res, rej) => {
+      const r = store.getAll(); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
     });
   }
-
   async function dbGet(id) {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readonly');
-      const req = tx.objectStore(STORE).get(id);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
+    const store = await tx('readonly');
+    return new Promise((res, rej) => {
+      const r = store.get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    });
+  }
+  async function dbDel(id) {
+    const store = await tx('readwrite');
+    return new Promise((res, rej) => {
+      const r = store.delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error);
     });
   }
 
-  async function dbDelete(id) {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readwrite');
-      const req = tx.objectStore(STORE).delete(id);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
-    });
-  }
+  // ===== プレイヤー =====
+  let activeURL = null;
 
-  // ===== 保存リスト UI =====
-  const savedItems = document.getElementById('savedItems');
-  let activeObjectURL = null;
-
-  function setVideoSrc(url) {
-    if (activeObjectURL) {
-      URL.revokeObjectURL(activeObjectURL);
-      activeObjectURL = null;
-    }
-    if (url.startsWith('blob:')) activeObjectURL = url;
+  function play(url) {
+    if (activeURL) URL.revokeObjectURL(activeURL);
+    activeURL = url.startsWith('blob:') ? url : null;
     videoPlayer.src = url;
+    emptyState.classList.add('hidden');
     videoPlayer.play().catch(() => {});
   }
 
-  function formatDate(d) {
-    const date = new Date(d);
-    return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
+  async function saveAndPlay(file) {
+    await dbAdd({ name: file.name, blob: file, addedAt: Date.now() });
+    play(URL.createObjectURL(file));
+    refreshLibrary();
   }
 
-  async function refreshSavedList() {
+  async function refreshLibrary() {
     const items = await dbGetAll();
     items.sort((a, b) => b.addedAt - a.addedAt);
-    savedItems.innerHTML = '';
-    if (items.length === 0) {
-      savedItems.innerHTML = '<div class="empty">保存された動画はまだありません</div>';
-      return;
-    }
+    library.innerHTML = '';
+
+    const addCard = document.createElement('div');
+    addCard.className = 'lib-card add';
+    addCard.innerHTML = `<div class="add-content"><div class="lib-icon">＋</div><div style="font-size:10px">追加</div></div>`;
+    addCard.addEventListener('click', () => fileInput.click());
+    library.appendChild(addCard);
+
+    if (items.length === 0) return;
+
     for (const item of items) {
-      const el = document.createElement('div');
-      el.className = 'saved-item';
-      el.innerHTML = `
-        <span class="icon">${item.type === 'file' ? '🎞️' : '🔗'}</span>
-        <span class="name"></span>
-        <span class="meta"></span>
-        <button class="delete-btn" title="削除">✕</button>
+      const card = document.createElement('div');
+      card.className = 'lib-card';
+      card.innerHTML = `
+        <div class="lib-icon">🎬</div>
+        <div class="lib-name"></div>
+        <button class="lib-del" title="削除">✕</button>
       `;
-      el.querySelector('.name').textContent = item.name;
-      el.querySelector('.meta').textContent = formatDate(item.addedAt);
-      el.addEventListener('click', async (e) => {
-        if (e.target.classList.contains('delete-btn')) return;
+      card.querySelector('.lib-name').textContent = item.name;
+      card.addEventListener('click', async (e) => {
+        if (e.target.closest('.lib-del')) return;
         const rec = await dbGet(item.id);
-        if (rec.type === 'file') {
-          setVideoSrc(URL.createObjectURL(rec.blob));
-        } else {
-          setVideoSrc(rec.url);
-        }
+        play(URL.createObjectURL(rec.blob));
       });
-      el.querySelector('.delete-btn').addEventListener('click', async (e) => {
+      card.querySelector('.lib-del').addEventListener('click', async (e) => {
         e.stopPropagation();
-        await dbDelete(item.id);
-        refreshSavedList();
+        await dbDel(item.id);
+        refreshLibrary();
       });
-      savedItems.appendChild(el);
+      library.appendChild(card);
     }
   }
 
   fileInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
-    if (!file) return;
-    await dbAdd({
-      type: 'file',
-      name: file.name,
-      mime: file.type,
-      blob: file,
-      addedAt: Date.now()
-    });
-    setVideoSrc(URL.createObjectURL(file));
+    if (file) await saveAndPlay(file);
     fileInput.value = '';
-    refreshSavedList();
   });
 
-  urlInput.addEventListener('change', async (e) => {
-    const url = e.target.value.trim();
-    if (!url) return;
-    await dbAdd({
-      type: 'url',
-      name: url,
-      url: url,
-      addedAt: Date.now()
+  document.getElementById('addBtn').addEventListener('click', () => fileInput.click());
+  document.getElementById('lockBtn').addEventListener('click', lock);
+  document.getElementById('fullscreenBtn').addEventListener('click', () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else stageArea.requestFullscreen?.();
+  });
+
+  // ドラッグ&ドロップ
+  ['dragenter', 'dragover'].forEach(ev => {
+    stageArea.addEventListener(ev, (e) => {
+      e.preventDefault();
+      if (player.classList.contains('active')) dropOverlay.classList.add('show');
     });
-    setVideoSrc(url);
-    urlInput.value = '';
-    refreshSavedList();
   });
-
+  ['dragleave', 'drop'].forEach(ev => {
+    stageArea.addEventListener(ev, (e) => {
+      e.preventDefault();
+      dropOverlay.classList.remove('show');
+    });
+  });
+  stageArea.addEventListener('drop', async (e) => {
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('video/')) await saveAndPlay(file);
+  });
 </script>
 </body>
 </html>
