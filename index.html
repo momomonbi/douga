@@ -89,6 +89,11 @@
     padding: 20px;
   }
 
+  /* プレイヤー表示中はパディングを外して全画面 */
+  .stage.playing {
+    padding: 0;
+  }
+
   /* ===== ロック画面 ===== */
   .lock-screen {
     width: 100%;
@@ -292,21 +297,30 @@
     display: none;
     width: 100%;
     height: 100%;
-    flex-direction: column;
-    gap: 12px;
+    position: relative;
   }
 
   .player.active {
-    display: flex;
+    display: block;
     animation: rise 0.5s ease-out;
   }
 
   .player-bar {
-    flex: 0 0 auto;
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    z-index: 10;
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 0 4px;
+    padding: 16px 20px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+    transition: opacity 0.3s, transform 0.3s;
+  }
+
+  .player.idle .player-bar {
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
   }
 
   .player-bar .brand {
@@ -340,14 +354,11 @@
   .icon-btn svg { width: 18px; height: 18px; }
 
   .stage-area {
-    flex: 1 1 auto;
-    min-height: 0;
+    width: 100%;
+    height: 100%;
     background: #000;
-    border-radius: 16px;
     overflow: hidden;
     position: relative;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
   }
 
   video {
@@ -378,26 +389,35 @@
     inset: 0;
     background: rgba(0, 245, 255, 0.15);
     border: 3px dashed var(--accent-1);
-    border-radius: 16px;
     display: none;
     align-items: center;
     justify-content: center;
     font-size: 20px;
     font-weight: 600;
     color: var(--accent-1);
-    z-index: 5;
+    z-index: 20;
   }
 
   .drop-overlay.show { display: flex; }
 
   .library {
-    flex: 0 0 auto;
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    z-index: 10;
     display: flex;
     gap: 10px;
     overflow-x: auto;
-    padding: 4px 4px 8px;
+    padding: 60px 20px 16px;
+    background: linear-gradient(to top, rgba(0,0,0,0.85), transparent);
     scrollbar-width: thin;
     scrollbar-color: rgba(255,255,255,0.2) transparent;
+    transition: opacity 0.3s, transform 0.3s;
+  }
+
+  .player.idle .library {
+    opacity: 0;
+    transform: translateY(20px);
+    pointer-events: none;
   }
 
   .library::-webkit-scrollbar { height: 6px; }
@@ -601,18 +621,36 @@
     setTimeout(() => {
       lockScreen.style.display = 'none';
       player.classList.add('active');
+      stage.classList.add('playing');
       refreshLibrary();
+      resetIdleTimer();
     }, 350);
   }
 
   function lock() {
     player.classList.remove('active');
+    stage.classList.remove('playing');
     lockScreen.style.display = 'block';
     lockOrb.classList.remove('unlocked');
     currentPasscode = '';
     updateDots();
     videoPlayer.pause();
   }
+
+  // マウス非操作時にUIを自動的に隠す
+  let idleTimer = null;
+  function resetIdleTimer() {
+    player.classList.remove('idle');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      if (player.classList.contains('active')) player.classList.add('idle');
+    }, 2500);
+  }
+  ['mousemove', 'mousedown', 'touchstart', 'keydown'].forEach(ev => {
+    document.addEventListener(ev, () => {
+      if (player.classList.contains('active')) resetIdleTimer();
+    });
+  });
 
   function checkPasscode() {
     if (currentPasscode === CORRECT_PASSCODE) unlock();
