@@ -489,6 +489,96 @@
     flex-direction: column;
     align-items: center;
   }
+
+  /* ===== パスコード変更モーダル ===== */
+  .modal {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(5, 6, 15, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .modal.show { display: flex; animation: rise 0.3s ease-out; }
+
+  .modal-card {
+    width: 100%;
+    max-width: 380px;
+    text-align: center;
+  }
+
+  .modal-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 18px;
+    background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 30px rgba(0, 245, 255, 0.4);
+  }
+
+  .modal-icon svg { width: 28px; height: 28px; color: #05060f; }
+
+  .modal-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .modal-sub {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 12px;
+    margin-bottom: 24px;
+    letter-spacing: 0.5px;
+  }
+
+  .modal .passcode-display { margin-bottom: 24px; }
+  .modal .keypad { max-width: 280px; gap: 12px; }
+  .modal .key { font-size: 22px; }
+
+  .modal-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .modal-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.7);
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.15s;
+  }
+
+  .modal-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+  }
+
+  .modal-status {
+    margin-top: 14px;
+    height: 18px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    transition: opacity 0.2s;
+    opacity: 0;
+  }
+
+  .modal-status.show { opacity: 1; }
+  .modal-status.error { color: #ff3860; }
+  .modal-status.success { color: var(--accent-1); }
 </style>
 </head>
 <body>
@@ -548,6 +638,14 @@
             <path d="M12 5v14M5 12h14"/>
           </svg>
         </button>
+        <button class="icon-btn" id="changePassBtn" title="パスコード変更">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="8" cy="15" r="4"/>
+            <path d="M10.85 12.15 19 4"/>
+            <path d="M18 5l3 3"/>
+            <path d="M15 8l3 3"/>
+          </svg>
+        </button>
         <button class="icon-btn" id="fullscreenBtn" title="フルスクリーン">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>
@@ -577,10 +675,54 @@
 
       <input type="file" id="fileInput" accept="video/*" hidden>
     </div>
+
+    <!-- パスコード変更モーダル -->
+    <div class="modal" id="passModal">
+      <div class="modal-card">
+        <div class="modal-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="8" cy="15" r="4"/>
+            <path d="M10.85 12.15 19 4"/>
+            <path d="M18 5l3 3"/>
+            <path d="M15 8l3 3"/>
+          </svg>
+        </div>
+        <div class="modal-title" id="modalTitle">パスコード変更</div>
+        <div class="modal-sub" id="modalSub">現在のパスコードを入力</div>
+
+        <div class="passcode-display" id="modalDots">
+          <div class="passcode-dot"></div>
+          <div class="passcode-dot"></div>
+          <div class="passcode-dot"></div>
+          <div class="passcode-dot"></div>
+        </div>
+
+        <div class="keypad" id="modalKeypad">
+          <button class="key" data-num="1">1</button>
+          <button class="key" data-num="2">2</button>
+          <button class="key" data-num="3">3</button>
+          <button class="key" data-num="4">4</button>
+          <button class="key" data-num="5">5</button>
+          <button class="key" data-num="6">6</button>
+          <button class="key" data-num="7">7</button>
+          <button class="key" data-num="8">8</button>
+          <button class="key" data-num="9">9</button>
+          <button class="key action" data-action="clear">CLEAR</button>
+          <button class="key" data-num="0">0</button>
+          <button class="key action" data-action="delete">⌫</button>
+        </div>
+
+        <div class="modal-status" id="modalStatus"></div>
+
+        <div class="modal-actions">
+          <button class="modal-btn" id="modalCancel">キャンセル</button>
+        </div>
+      </div>
+    </div>
   </div>
 
 <script>
-  const CORRECT_PASSCODE = '1234';
+  const DEFAULT_PASSCODE = '1234';
 
   const stage = document.getElementById('stage');
   const lockScreen = document.getElementById('lockScreen');
@@ -652,8 +794,9 @@
     });
   });
 
-  function checkPasscode() {
-    if (currentPasscode === CORRECT_PASSCODE) unlock();
+  async function checkPasscode() {
+    const expected = await getPasscode();
+    if (currentPasscode === expected) unlock();
     else showError();
   }
 
@@ -695,16 +838,20 @@
   // ===== IndexedDB =====
   const DB_NAME = 'videoPlayerDB';
   const STORE = 'videos';
+  const SETTINGS = 'settings';
   let dbPromise = null;
 
   function openDB() {
     if (dbPromise) return dbPromise;
     dbPromise = new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, 1);
+      const req = indexedDB.open(DB_NAME, 2);
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains(STORE)) {
           db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+        }
+        if (!db.objectStoreNames.contains(SETTINGS)) {
+          db.createObjectStore(SETTINGS);
         }
       };
       req.onsuccess = () => resolve(req.result);
@@ -713,8 +860,26 @@
     return dbPromise;
   }
 
-  function tx(mode) {
-    return openDB().then(db => db.transaction(STORE, mode).objectStore(STORE));
+  function tx(mode, store = STORE) {
+    return openDB().then(db => db.transaction(store, mode).objectStore(store));
+  }
+
+  async function getPasscode() {
+    const store = await tx('readonly', SETTINGS);
+    return new Promise((res) => {
+      const r = store.get('passcode');
+      r.onsuccess = () => res(r.result || DEFAULT_PASSCODE);
+      r.onerror = () => res(DEFAULT_PASSCODE);
+    });
+  }
+
+  async function setPasscode(code) {
+    const store = await tx('readwrite', SETTINGS);
+    return new Promise((res, rej) => {
+      const r = store.put(code, 'passcode');
+      r.onsuccess = () => res();
+      r.onerror = () => rej(r.error);
+    });
   }
 
   async function dbAdd(rec) {
@@ -806,6 +971,131 @@
   document.getElementById('fullscreenBtn').addEventListener('click', () => {
     if (document.fullscreenElement) document.exitFullscreen();
     else stageArea.requestFullscreen?.();
+  });
+
+  // ===== パスコード変更モーダル =====
+  const passModal = document.getElementById('passModal');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalSub = document.getElementById('modalSub');
+  const modalDots = document.getElementById('modalDots').querySelectorAll('.passcode-dot');
+  const modalKeypad = document.getElementById('modalKeypad');
+  const modalStatus = document.getElementById('modalStatus');
+
+  let modalStep = 0; // 0: verify current, 1: new, 2: confirm
+  let modalInput = '';
+  let newPasscodeBuf = '';
+
+  function setModalStatus(msg, type) {
+    modalStatus.textContent = msg;
+    modalStatus.className = 'modal-status show ' + (type || '');
+    if (msg) setTimeout(() => modalStatus.classList.remove('show'), 1800);
+  }
+
+  function updateModalDots() {
+    modalDots.forEach((d, i) => {
+      d.classList.toggle('filled', i < modalInput.length);
+      d.classList.remove('error');
+    });
+  }
+
+  function modalShake() {
+    modalDots.forEach(d => d.classList.add('error'));
+    setTimeout(() => {
+      modalInput = '';
+      updateModalDots();
+    }, 600);
+  }
+
+  function setStep(step) {
+    modalStep = step;
+    modalInput = '';
+    updateModalDots();
+    if (step === 0) {
+      modalTitle.textContent = 'パスコード変更';
+      modalSub.textContent = '現在のパスコードを入力';
+    } else if (step === 1) {
+      modalTitle.textContent = '新しいパスコード';
+      modalSub.textContent = '新しい4桁を入力';
+    } else if (step === 2) {
+      modalTitle.textContent = 'もう一度入力';
+      modalSub.textContent = '確認のためもう一度';
+    }
+  }
+
+  function openPassModal() {
+    newPasscodeBuf = '';
+    setStep(0);
+    passModal.classList.add('show');
+  }
+
+  function closePassModal() {
+    passModal.classList.remove('show');
+    modalInput = '';
+    newPasscodeBuf = '';
+    updateModalDots();
+  }
+
+  async function modalSubmit() {
+    if (modalStep === 0) {
+      const expected = await getPasscode();
+      if (modalInput === expected) {
+        setStep(1);
+      } else {
+        modalShake();
+        setModalStatus('現在のパスコードが違います', 'error');
+      }
+    } else if (modalStep === 1) {
+      newPasscodeBuf = modalInput;
+      setStep(2);
+    } else if (modalStep === 2) {
+      if (modalInput === newPasscodeBuf) {
+        await setPasscode(newPasscodeBuf);
+        setModalStatus('パスコードを変更しました', 'success');
+        setTimeout(closePassModal, 1200);
+      } else {
+        modalShake();
+        setModalStatus('一致しません。最初からやり直してください', 'error');
+        setTimeout(() => setStep(1), 700);
+      }
+    }
+  }
+
+  modalKeypad.addEventListener('click', (e) => {
+    const key = e.target.closest('.key');
+    if (!key) return;
+    if (key.dataset.action === 'clear') {
+      modalInput = '';
+      updateModalDots();
+    } else if (key.dataset.action === 'delete') {
+      modalInput = modalInput.slice(0, -1);
+      updateModalDots();
+    } else if (key.dataset.num) {
+      if (modalInput.length >= 4) return;
+      modalInput += key.dataset.num;
+      updateModalDots();
+      if (modalInput.length === 4) setTimeout(modalSubmit, 180);
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (!passModal.classList.contains('show')) return;
+    if (/^[0-9]$/.test(e.key)) {
+      if (modalInput.length >= 4) return;
+      modalInput += e.key;
+      updateModalDots();
+      if (modalInput.length === 4) setTimeout(modalSubmit, 180);
+    } else if (e.key === 'Backspace') {
+      modalInput = modalInput.slice(0, -1);
+      updateModalDots();
+    } else if (e.key === 'Escape') {
+      closePassModal();
+    }
+  });
+
+  document.getElementById('changePassBtn').addEventListener('click', openPassModal);
+  document.getElementById('modalCancel').addEventListener('click', closePassModal);
+  passModal.addEventListener('click', (e) => {
+    if (e.target === passModal) closePassModal();
   });
 
   // ドラッグ&ドロップ
