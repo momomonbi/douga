@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>パスコード付き動画プレイヤー</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    color: #fff;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 720px;
+  }
+
+  /* ロック画面 */
+  .lock-screen {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 48px 32px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  }
+
+  .lock-icon {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 24px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+  }
+
+  .lock-screen h1 {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .lock-screen p {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+
+  .passcode-display {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .passcode-dot {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    transition: all 0.2s;
+  }
+
+  .passcode-dot.filled {
+    background: #fff;
+    border-color: #fff;
+  }
+
+  .passcode-dot.error {
+    border-color: #ff4757;
+    animation: shake 0.4s ease-in-out;
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+  }
+
+  .keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    max-width: 280px;
+    margin: 0 auto;
+  }
+
+  .key {
+    aspect-ratio: 1;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    font-size: 24px;
+    font-weight: 400;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+
+  .key:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .key:active {
+    transform: scale(0.95);
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  .key.action {
+    background: transparent;
+    font-size: 14px;
+  }
+
+  .key.action:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .error-message {
+    color: #ff4757;
+    font-size: 13px;
+    margin-top: 16px;
+    min-height: 18px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .error-message.show {
+    opacity: 1;
+  }
+
+  /* プレイヤー画面 */
+  .player-screen {
+    display: none;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+
+  .player-screen.active {
+    display: block;
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .player-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .player-header h2 {
+    font-size: 16px;
+    font-weight: 500;
+  }
+
+  .lock-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.15s;
+  }
+
+  .lock-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  video {
+    width: 100%;
+    display: block;
+    background: #000;
+  }
+
+  .video-source-input {
+    padding: 16px 20px;
+    background: rgba(0, 0, 0, 0.3);
+  }
+
+  .video-source-input label {
+    display: block;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 8px;
+  }
+
+  .video-source-input input[type="file"],
+  .video-source-input input[type="text"] {
+    width: 100%;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+
+  .video-source-input input[type="text"]::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <!-- ロック画面 -->
+    <div id="lockScreen" class="lock-screen">
+      <div class="lock-icon">🔒</div>
+      <h1>パスコードを入力</h1>
+      <p>動画を再生するには4桁のパスコードを入力してください</p>
+
+      <div class="passcode-display" id="passcodeDisplay">
+        <div class="passcode-dot"></div>
+        <div class="passcode-dot"></div>
+        <div class="passcode-dot"></div>
+        <div class="passcode-dot"></div>
+      </div>
+
+      <div class="keypad">
+        <button class="key" data-num="1">1</button>
+        <button class="key" data-num="2">2</button>
+        <button class="key" data-num="3">3</button>
+        <button class="key" data-num="4">4</button>
+        <button class="key" data-num="5">5</button>
+        <button class="key" data-num="6">6</button>
+        <button class="key" data-num="7">7</button>
+        <button class="key" data-num="8">8</button>
+        <button class="key" data-num="9">9</button>
+        <button class="key action" id="clearKey">クリア</button>
+        <button class="key" data-num="0">0</button>
+        <button class="key action" id="deleteKey">⌫</button>
+      </div>
+
+      <div class="error-message" id="errorMessage">パスコードが違います</div>
+    </div>
+
+    <!-- プレイヤー画面 -->
+    <div id="playerScreen" class="player-screen">
+      <div class="player-header">
+        <h2>🎬 動画プレイヤー</h2>
+        <button class="lock-btn" id="lockBtn">ロック</button>
+      </div>
+      <video id="videoPlayer" controls controlsList="nodownload">
+        お使いのブラウザは video タグに対応していません。
+      </video>
+      <div class="video-source-input">
+        <label>動画ファイルを選択</label>
+        <input type="file" id="fileInput" accept="video/*">
+        <label>または動画URLを入力</label>
+        <input type="text" id="urlInput" placeholder="https://example.com/video.mp4">
+      </div>
+    </div>
+  </div>
+
+<script>
+  // パスコード（4桁）。必要に応じて変更してください。
+  const CORRECT_PASSCODE = '1234';
+
+  const lockScreen = document.getElementById('lockScreen');
+  const playerScreen = document.getElementById('playerScreen');
+  const dots = document.querySelectorAll('.passcode-dot');
+  const errorMessage = document.getElementById('errorMessage');
+  const videoPlayer = document.getElementById('videoPlayer');
+  const fileInput = document.getElementById('fileInput');
+  const urlInput = document.getElementById('urlInput');
+
+  let currentPasscode = '';
+
+  function updateDisplay() {
+    dots.forEach((dot, i) => {
+      dot.classList.toggle('filled', i < currentPasscode.length);
+      dot.classList.remove('error');
+    });
+  }
+
+  function showError() {
+    dots.forEach(dot => dot.classList.add('error'));
+    errorMessage.classList.add('show');
+    setTimeout(() => {
+      currentPasscode = '';
+      updateDisplay();
+      errorMessage.classList.remove('show');
+    }, 600);
+  }
+
+  function unlock() {
+    lockScreen.style.display = 'none';
+    playerScreen.classList.add('active');
+  }
+
+  function lock() {
+    playerScreen.classList.remove('active');
+    lockScreen.style.display = 'block';
+    currentPasscode = '';
+    updateDisplay();
+    videoPlayer.pause();
+  }
+
+  function checkPasscode() {
+    if (currentPasscode === CORRECT_PASSCODE) {
+      unlock();
+    } else {
+      showError();
+    }
+  }
+
+  document.querySelectorAll('.key[data-num]').forEach(key => {
+    key.addEventListener('click', () => {
+      if (currentPasscode.length >= 4) return;
+      currentPasscode += key.dataset.num;
+      updateDisplay();
+      if (currentPasscode.length === 4) {
+        setTimeout(checkPasscode, 150);
+      }
+    });
+  });
+
+  document.getElementById('deleteKey').addEventListener('click', () => {
+    currentPasscode = currentPasscode.slice(0, -1);
+    updateDisplay();
+  });
+
+  document.getElementById('clearKey').addEventListener('click', () => {
+    currentPasscode = '';
+    updateDisplay();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (playerScreen.classList.contains('active')) return;
+    if (/^[0-9]$/.test(e.key)) {
+      if (currentPasscode.length >= 4) return;
+      currentPasscode += e.key;
+      updateDisplay();
+      if (currentPasscode.length === 4) {
+        setTimeout(checkPasscode, 150);
+      }
+    } else if (e.key === 'Backspace') {
+      currentPasscode = currentPasscode.slice(0, -1);
+      updateDisplay();
+    } else if (e.key === 'Escape') {
+      currentPasscode = '';
+      updateDisplay();
+    }
+  });
+
+  document.getElementById('lockBtn').addEventListener('click', lock);
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      videoPlayer.src = url;
+      videoPlayer.play();
+    }
+  });
+
+  urlInput.addEventListener('change', (e) => {
+    const url = e.target.value.trim();
+    if (url) {
+      videoPlayer.src = url;
+      videoPlayer.play();
+    }
+  });
+</script>
+</body>
+</html>
